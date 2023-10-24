@@ -1,0 +1,43 @@
+services:
+  traefik:
+    image: "traefik:v2.5"
+    container_name: "traefik"
+    command:
+      # - "--log.level=DEBUG"
+      - "--api.dashboard=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesResolvers.letsencrypt.acme.email=admin@${DOMAIN}"
+      - "--certificatesResolvers.letsencrypt.acme.tlsChallenge=true"
+      - "--certificatesResolvers.letsencrypt.acme.httpChallenge=true"
+      - "--certificatesResolvers.letsencrypt.acme.httpChallenge.entryPoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json"
+    labels:
+      # global redirect to https
+      - "traefik.enable=true"
+      - "traefik.frontend.rule=HostRegexp(`{any:.+}`)"
+      - "traefik.port=80"
+      - "traefik.http.routers.http_catchall.rule=HostRegexp(`{any:.+}`)"
+      - "traefik.http.routers.http_catchall.entrypoints=web"
+      - "traefik.http.routers.http_catchall.middlewares=https_redirect"
+      - "traefik.http.middlewares.https_redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.https_redirect.redirectscheme.permanent=true"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./traefik:/traefik"
+    ports:
+      - "80:80"
+      - "443:443"
+
+  mattermost:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mattermost.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.mattermost.entrypoints=websecure"
+      - "traefik.http.routers.mattermost.tls.certresolver=letsencrypt"
+      - "traefik.http.services.mattermost.loadbalancer.server.port=8065"
+    ports:
+      - ${CALLS_PORT}:${CALLS_PORT}/udp
+      - ${CALLS_PORT}:${CALLS_PORT}/tcp
